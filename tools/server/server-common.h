@@ -5,6 +5,7 @@
 #include "llama.h"
 #include "chat.h"
 #include "mtmd.h"
+#include "server-http.h"
 
 #define JSON_ASSERT GGML_ASSERT
 #include <nlohmann/json.hpp>
@@ -313,7 +314,7 @@ json convert_responses_to_chatcmpl(const json & body);
 // convert OpenAI transcriptions API format to OpenAI Chat Completions API format
 json convert_transcriptions_to_chatcmpl(
     const json & body,
-    const std::map<std::string, raw_buffer> & in_files,
+    const std::map<std::string, uploaded_file> & in_files,
     std::vector<raw_buffer> & out_files);
 
 // convert Anthropic Messages API format to OpenAI Chat Completions API format

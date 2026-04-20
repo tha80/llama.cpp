@@ -1124,9 +1124,8 @@ static bool should_strip_proxy_header(const std::string & header_name) {
 }
 
 static std::string generate_multipart_boundary() {
+    thread_local std::mt19937 gen(std::random_device{}());
     static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-    std::random_device rd;
-    std::mt19937 gen(rd());
     std::uniform_int_distribution<> dis(0, sizeof(chars) - 2);
     std::string boundary = "----llama-cpp-proxy-";
     for (int i = 0; i < 16; i++) {
@@ -1137,7 +1136,7 @@ static std::string generate_multipart_boundary() {
 
 static std::string build_multipart_body(
         const json & form_fields,
-        const std::map<std::string, raw_buffer> & files,
+        const std::map<std::string, uploaded_file> & files,
         const std::string & boundary) {
     std::string body;
 
@@ -1157,12 +1156,20 @@ static std::string build_multipart_body(
         }
     }
 
-    for (const auto & [key, data] : files) {
+    for (const auto & [key, file] : files) {
         body += "--" + boundary + "\r\n";
-        body += "Content-Disposition: form-data; name=\"" + key + "\"; filename=\"" + key + "\"\r\n";
-        body += "Content-Type: application/octet-stream\r\n";
+        body += "Content-Disposition: form-data; name=\"" + key + "\"";
+        if (!file.filename.empty()) {
+            body += "; filename=\"" + file.filename + "\"";
+        }
         body += "\r\n";
-        body.append(data.begin(), data.end());
+        if (!file.content_type.empty()) {
+            body += "Content-Type: " + file.content_type + "\r\n";
+        } else {
+            body += "Content-Type: application/octet-stream\r\n";
+        }
+        body += "\r\n";
+        body.append(file.data.begin(), file.data.end());
         body += "\r\n";
     }
 
@@ -1178,7 +1185,7 @@ server_http_proxy::server_http_proxy(
         const std::string & path,
         const std::map<std::string, std::string> & headers,
         const std::string & body,
-        const std::map<std::string, raw_buffer> & files,
+        const std::map<std::string, uploaded_file> & files,
         const std::function<bool()> should_stop,
         int32_t timeout_read,
         int32_t timeout_write
@@ -1247,10 +1254,14 @@ server_http_proxy::server_http_proxy(
     bool has_files = !files.empty();
 
     if (has_files) {
-        auto boundary = generate_multipart_boundary();
-        json form_fields = json::parse(body);
-        effective_body = build_multipart_body(form_fields, files, boundary);
-        override_content_type = "multipart/form-data; boundary=" + boundary;
+        json form_fields = json::parse(body, nullptr, false);
+        if (!form_fields.is_discarded()) {
+            auto boundary = generate_multipart_boundary();
+            effective_body = build_multipart_body(form_fields, files, boundary);
+            override_content_type = "multipart/form-data; boundary=" + boundary;
+        } else {
+            SRV_ERR("%s", "failed to parse multipart form fields JSON\n");
+        }
     }
 
     // prepare the request to destination server
