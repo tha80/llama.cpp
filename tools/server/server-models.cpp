@@ -1163,12 +1163,18 @@ static std::string build_multipart_body(
                 body << "--" << boundary << "\r\n";
                 body << "Content-Disposition: form-data; name=\"" << sanitize_field(key) << "\"\r\n";
                 body << "\r\n";
+                if (!item.is_string()) {
+                    throw std::invalid_argument("expected string");
+                }
                 body << item.get<std::string>() << "\r\n";
             }
         } else {
             body << "--" << boundary << "\r\n";
             body << "Content-Disposition: form-data; name=\"" << sanitize_field(key) << "\"\r\n";
             body << "\r\n";
+            if (!value.is_string()) {
+                throw std::invalid_argument("expected string");
+            }
             body << value.get<std::string>() << "\r\n";
         }
     }
