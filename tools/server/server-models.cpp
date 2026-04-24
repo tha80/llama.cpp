@@ -1144,19 +1144,30 @@ static std::string build_multipart_body(
         const json & form_fields,
         const std::map<std::string, uploaded_file> & files,
         const std::string & boundary) {
+    static auto sanitize_field = [](const std::string & text) {
+        std::string result;
+        result.reserve(text.size());
+        for (char c : text) {
+            if (c != '\n' && c != '\r') {
+                result += c;
+            }
+        }
+        return result;
+    };
+
     std::ostringstream body;
 
     for (const auto & [key, value] : form_fields.items()) {
         if (value.is_array()) {
             for (const auto & item : value) {
                 body << "--" << boundary << "\r\n";
-                body << "Content-Disposition: form-data; name=\"" << key << "\"\r\n";
+                body << "Content-Disposition: form-data; name=\"" << sanitize_field(key) << "\"\r\n";
                 body << "\r\n";
                 body << item.get<std::string>() << "\r\n";
             }
         } else {
             body << "--" << boundary << "\r\n";
-            body << "Content-Disposition: form-data; name=\"" << key << "\"\r\n";
+            body << "Content-Disposition: form-data; name=\"" << sanitize_field(key) << "\"\r\n";
             body << "\r\n";
             body << value.get<std::string>() << "\r\n";
         }
@@ -1164,13 +1175,13 @@ static std::string build_multipart_body(
 
     for (const auto & [key, file] : files) {
         body << "--" << boundary << "\r\n";
-        body << "Content-Disposition: form-data; name=\"" << key << "\"";
+        body << "Content-Disposition: form-data; name=\"" << sanitize_field(key) << "\"";
         if (!file.filename.empty()) {
-            body << "; filename=\"" << file.filename << "\"";
+            body << "; filename=\"" << sanitize_field(file.filename) << "\"";
         }
         body << "\r\n";
         if (!file.content_type.empty()) {
-            body << "Content-Type: " << file.content_type << "\r\n";
+            body << "Content-Type: " << sanitize_field(file.content_type) << "\r\n";
         } else {
             body << "Content-Type: application/octet-stream\r\n";
         }
