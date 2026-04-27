@@ -1148,7 +1148,7 @@ static std::string build_multipart_body(
         std::string result;
         result.reserve(text.size());
         for (char c : text) {
-            if (c != '\n' && c != '\r') {
+            if (c != '\n' && c != '\r' && c != '"') {
                 result += c;
             }
         }
@@ -1283,7 +1283,7 @@ server_http_proxy::server_http_proxy(
             effective_body = build_multipart_body(form_fields, files, boundary);
             override_content_type = "multipart/form-data; boundary=" + boundary;
         } else {
-            SRV_ERR("%s", "failed to parse multipart form fields JSON\n");
+            throw std::runtime_error("failed to parse multipart form fields JSON");
         }
     }
 
